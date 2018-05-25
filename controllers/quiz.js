@@ -1,5 +1,9 @@
 const Sequelize = require("sequelize");
 const {models} = require("../models");
+const op = Sequelize.Op;
+
+
+
 
 // Autoload the quiz with id equals to :quizId
 exports.load = (req, res, next, quizId) => {
@@ -154,64 +158,83 @@ exports.check = (req, res, next) => {
     });
 };
 
-exports.randomplay = (req, res, next) => {
 
-    req.session.randomplay = req.session.randomplay || [];
-    const score = req.session.randomplay.length;
 
-    Sequelize.Promise.resolve()
-    .then( () => {
+// GET /quizzes/randomplay
 
-        if(req.session.randomplay.lastQuizId){
-            return models.quiz.findById(req.session.randomplay.lastQuizId);
-        } 
-        else{
+exports.randomplay = (req,res,next) =>{
 
-            const whereOpt = {'id' : {[Sequelize.Op.notIn]:req.session.randomplay}};
+    const {quiz, query} = req;  //implementamos autoload
 
-            return models.quiz.count({where: whereOpt})
-            .then( count => {
+    let empieza=0;  //contador inicio juego
+    let acaba=5;
+    let primera_bien=1;
 
-                return models.quiz.findAll({
-                    where: whereOpt,
-                    offset: Math.floor(Math.random()*count),
-                    limit:1
-                }).then( quizzes => quizzes[0]);
-            })
-            .then( quiz => {
-
-                if(quiz){
-                    res.render('quizzes/random_play', {quiz,score});
-                } 
-                else{
-                    res.render('quizzes/random_nomore', {score})
-                        score
-                }
-
-            })
+    req.session.randomPlay = req.session.randomPlay || [];
+    const whereOp = {id: {[op.notIn]: req.session.randomPlay}};  //buscamos quizzes y se lo añadimos a whereOp
+    
+    models.quiz.count({where:whereOp}) //contamos los quizzes de whereOP
+    .then(count => {
+        if(!count){  
+            let score = req.session.randomPlay.length;
+            req.session.randomPlay = []; 
+            
+            res.render('quizzes/random_nomore',{
+                score: score
+            });
         }
-
+        
+    let i=0; //contador
+    let j=0;
+    let reinicia=0;
+    let aleatorio =  Math.floor(count*Math.random());  //buscamos quizzes aleatorios para no repetir
+    return models.quiz.findAll({where: whereOp, offset:aleatorio, limit: 1})
+        .then(quizzes => {
+            return quizzes[0];
+            });
     })
-    .catch(error => next(error));
-
+    .then(quiz =>{                      
+        let score = req.session.randomPlay.length;     //Seguimos jugando. renderizaos a random_play y añadimos valores a quiz y a score
+        res.render('quizzes/random_play',{
+            quiz: quiz, 
+            score: score}
+            );
+    })
+    .catch(error => {  //caso en el que se produzcan errores
+        next(error);
+    });
 };
 
-exports.randomcheck = (req, res, next) => {
 
-    req.session.randomplay = req.session.randomplay || [];
 
-    const answer = req.query.answer || "";
-    const answer2 = req.quiz.answer;
-    const result = answer.toLocaleLowerCase().trim() === answer2.toLocaleLowerCase().trim();
 
-    if(result){
-        req.session.randomplay.push(req.quiz.id);
-    }
-    const score = req.session.randomplay.length;
-    if(!result){
-        delete req.session.randomplay;
-    }
+// GET /quizzes/:quizId/randomcheck
+exports.randomcheck =  (req, res, next) => {
 
-    res.render('quizzes/random_result', {answer, result, score})
+    const {quiz, query} = req;  //implementamos autoload
+
+    let i=0; //contador
+    let j=0;
+    let reinicia=0;
+
+    let empieza=0; //contador inicio juego
+    let acaba=5;
+    let primera_bien=1;
     
+    const answer = query.answer || "";
+    const result = answer.toLowerCase().trim() === quiz.answer.toLowerCase().trim(); //comparamos si la respuesta dicha es igual a la respuesta que hay guardada en la bbdd
+    const score = req.session.randomPlay.length + result; 
+    
+    if(result) {
+        req.session.randomPlay.push(quiz.id);
+    } 
+    else {
+        req.session.randomPlay = [];
+    }
+    
+    res.render('quizzes/random_result', {  
+        result,
+        score,
+        answer
+    });
 };

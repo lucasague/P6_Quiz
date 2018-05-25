@@ -9,7 +9,7 @@ const Sequelize = require('sequelize');
 // To use  Heroku Postgres data base:
 //    DATABASE_URL = postgres://user:passwd@host:port/database
 
-const url = process.env.DATABASE_URL || "sqlite:quizes.sqlite";
+const url = process.env.DATABASE_URL || "sqlite:quizzes.sqlite";
 
 const sequelize = new Sequelize(url);
 
