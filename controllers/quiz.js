@@ -153,3 +153,65 @@ exports.check = (req, res, next) => {
         answer
     });
 };
+
+exports.randomplay = (req, res, next) => {
+
+    req.session.randomplay = req.session.randomplay || [];
+    const score = req.session.randomplay.length;
+
+    Sequelize.Promise.resolve()
+    .then( () => {
+
+        if(req.session.randomplay.lastQuizId){
+            return models.quiz.findById(req.session.randomplay.lastQuizId);
+        } 
+        else{
+
+            const whereOpt = {'id' : {[Sequelize.Op.notIn]:req.session.randomplay}};
+
+            return models.quiz.count({where: whereOpt})
+            .then( count => {
+
+                return models.quiz.findAll({
+                    where: whereOpt,
+                    offset: Math.floor(Math.random()*count),
+                    limit:1
+                }).then( quizzes => quizzes[0]);
+            })
+            .then( quiz => {
+
+                if(quiz){
+                    res.render('quizzes/random_play', {quiz,score});
+                } 
+                else{
+                    res.render('quizzes/random_nomore', {score})
+                        score
+                }
+
+            })
+        }
+
+    })
+    .catch(error => next(error));
+
+};
+
+exports.randomcheck = (req, res, next) => {
+
+    req.session.randomplay = req.session.randomplay || [];
+
+    const answer = req.query.answer || "";
+    const answer2 = req.quiz.answer;
+    const result = answer.toLocaleLowerCase().trim() === answer2.toLocaleLowerCase().trim();
+
+    if(result){
+        req.session.randomplay.push(req.quiz.id);
+    }
+    const score = req.session.randomplay.length;
+    if(!result){
+        delete req.session.randomplay;
+    }
+
+    res.render('quizzes/random_result', {answer, result, score})
+    
+};
